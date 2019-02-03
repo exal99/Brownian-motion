@@ -15,6 +15,7 @@ public class Constants {
 	private static final float H_START_VEL = 0.1f;
 	
 	private static final int TIME_STEP = 17;
+	private static final int T_MAX_LENGTH = 800;
 	
 	
 	public static int NUMBER_OF_LIGHT_ATOMS = N_LIGHT_ATOMS;
@@ -30,6 +31,7 @@ public class Constants {
 	public static float HEAVY_MAX_START_VEL = H_START_VEL;
 	
 	public static int SIMULATION_TIME_STEPS = TIME_STEP;
+	public static int TRAIL_MAX_LENGTH = T_MAX_LENGTH;
 	
 	public static final int GET_QUEUE_LIMIT() {
 		return (NUMBER_OF_LIGHT_ATOMS + NUMBER_OF_HEAVY_ATOMS) * 2;
@@ -49,6 +51,7 @@ public class Constants {
 		HEAVY_MAX_START_VEL = H_START_VEL;
 		
 		SIMULATION_TIME_STEPS = TIME_STEP;
+		TRAIL_MAX_LENGTH = T_MAX_LENGTH;
 	}
 
 }

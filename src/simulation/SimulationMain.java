@@ -2,6 +2,7 @@ package simulation;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
 import java.util.Hashtable;
+import java.util.LinkedList;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
@@ -23,7 +24,7 @@ public class SimulationMain extends PApplet {
 	private int newHeight;
 	
 	private Hashtable<Atom, Integer> selected;
-	private ArrayList<ArrayList<PVector>> selectedTrails;
+	private ArrayList<LinkedList<PVector>> selectedTrails;
 	
 	private Hashtable<Atom, Integer> indexMapping;
 	
@@ -35,11 +36,13 @@ public class SimulationMain extends PApplet {
 	}
 	
 	@Override
-	public synchronized void setup() {
+	public void setup() {
+		frameRate(60);
+		
 		surface.setResizable(true);
 		snapshotQueue = new ArrayBlockingQueue<SimulationDiffrence>(Constants.GET_QUEUE_LIMIT());
 		simThread = new SimulationThread(snapshotQueue, Constants.NUMBER_OF_LIGHT_ATOMS, Constants.NUMBER_OF_HEAVY_ATOMS, width, height, this);
-		
+		Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
 		atoms = simThread.getAtoms();
 			
 		paused = false;
@@ -47,7 +50,7 @@ public class SimulationMain extends PApplet {
 		
 		createIndexMapping();
 		selected = new Hashtable<Atom, Integer>();
-		selectedTrails = new ArrayList<ArrayList<PVector>>();
+		selectedTrails = new ArrayList<LinkedList<PVector>>();
 		
 		simThread.start();
 		waitForLoad();
@@ -57,6 +60,8 @@ public class SimulationMain extends PApplet {
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
+		
+		numWritten = -1;
 	}
 	
 	private void createIndexMapping() {
@@ -80,7 +85,7 @@ public class SimulationMain extends PApplet {
 		
 		createIndexMapping();
 		selected = new Hashtable<Atom, Integer>();
-		selectedTrails = new ArrayList<ArrayList<PVector>>();
+		selectedTrails = new ArrayList<LinkedList<PVector>>();
 		
 		simThread.start();
 		waitForLoad();
@@ -134,7 +139,7 @@ public class SimulationMain extends PApplet {
 			time += Constants.SIMULATION_TIME_STEPS;
 		}
 		
-		for (ArrayList<PVector> trail : selectedTrails) {
+		for (LinkedList<PVector> trail : selectedTrails) {
 			for (PVector pos : trail) {
 				stroke(0, 255, 0);
 				strokeWeight(3);
@@ -147,6 +152,9 @@ public class SimulationMain extends PApplet {
 			if (selected.containsKey(atom)) {
 				fill(244, 200, 66);
 				selectedTrails.get(selected.get(atom)).add(pos);
+				while (Constants.TRAIL_MAX_LENGTH > 0 && selectedTrails.get(selected.get(atom)).size() > Constants.TRAIL_MAX_LENGTH) {
+					selectedTrails.get(selected.get(atom)).pop();
+				}
 			} else 
 				fill(255,255,255);			
 			stroke(0);
@@ -154,7 +162,7 @@ public class SimulationMain extends PApplet {
 			ellipse(pos.x, pos.y, atom.getRadius() * 2, atom.getRadius() * 2);
 		}
 		
-		if (numWritten != 0) {
+		if (numWritten != -1) {
 			textSize(50);
 			fill(0, 255, 0);
 			text(numWritten, 30, 60);
@@ -163,6 +171,8 @@ public class SimulationMain extends PApplet {
 		fill(255, 0, 0);
 		textSize(30);
 		text("Total Kinetic Energy: " + Math.round(calcKeneticEnergy() * 100.0f) / 100.0f, 30, height - 40);
+		fill(0,246,255);
+		text("FPS: " + Math.round(frameRate), width-150, 40);
 		
 		while (time > nextUpdate.time) {
 			updateAtoms(nextUpdate.atoms);
@@ -190,7 +200,7 @@ public class SimulationMain extends PApplet {
 					selectedTrails.remove(index);
 				} else
 					selected.put(atom, selectedTrails.size());
-					selectedTrails.add(new ArrayList<PVector>());
+					selectedTrails.add(new LinkedList<PVector>());
 			}
 		}
 	}
@@ -207,89 +217,93 @@ public class SimulationMain extends PApplet {
 		}
 		
 		if ('0' <= key && key <= '9') {
+			if (numWritten == -1)
+				numWritten = 0;
 			numWritten *= 10;
 			numWritten += key - '0';
 		}
 		
 		if (key == 'n') {
-			if (numWritten != 0) {
+			if (numWritten != -1) {
 				Constants.NUMBER_OF_LIGHT_ATOMS = numWritten;
-				numWritten = 0;
+				numWritten = -1;
 				reset();
 			}
 		}
 		
 		if (key == 'N') {
-			if (numWritten != 0) {
+			if (numWritten != -1) {
 				Constants.NUMBER_OF_HEAVY_ATOMS = numWritten;
-				numWritten = 0;
+				numWritten = -1;
 				reset();
 			}
 		}
 		
 		if (key == 'W') {
-			if (numWritten != 0 && newHeight != 0) {
+			if (numWritten != -1 && newHeight != 0) {
 				surface.setSize(numWritten, newHeight);
 				reset();
-			} else if (numWritten != 0) {
+			} else if (numWritten != -1) {
 				newWidth = numWritten;
 			}
 			
-			if (numWritten != 0) {
-				numWritten = 0;
+			if (numWritten != -1) {
+				numWritten = -1;
 				newHeight = 0;
 			}
 		} 
 		
 		if (keyCode == BACKSPACE) {
 			numWritten /= 10;
+			if (numWritten == 0)
+				numWritten = -1;
 		}
 		
 		if (key == 's') {
-			if (numWritten != 0) 
+			if (numWritten != -1) 
 				Constants.LIGHT_MAX_START_VEL = numWritten / 1000.0f;
-			numWritten = 0;	
+			numWritten = -1;	
 		}
 		
 		if (key == 'S') {
-			if (numWritten != 0) 
+			if (numWritten != -1) 
 				Constants.HEAVY_MAX_START_VEL = numWritten / 1000.0f;
-			numWritten = 0;	
+			numWritten = -1;	
 		}
 		
 		if (key == 'H') {
-			if (numWritten != 0 && newWidth != 0) {
+			if (numWritten != -1 && newWidth != 0) {
 				surface.setSize(newWidth, numWritten);
 				reset();
-			} else if (numWritten != 0) {
+			} else if (numWritten != -1) {
 				newHeight = numWritten;
 			}
-			if (numWritten != 0) {
-				numWritten = 0;
+			if (numWritten != -1) {
+				numWritten = -1;
 				newWidth = 0;
 			}
 		}
 		
 		if (key == 'r') {
-			if (numWritten != 0) {
+			if (numWritten != -1) {
 				Constants.LIGHT_ATOM_RADIUS = numWritten;
 				reset();
 			}
-			numWritten = 0;
+			numWritten = -1;
 		}
 		
 		if (key == 'R') {
-			if (numWritten != 0) {
+			if (numWritten != -1) {
 				Constants.HEAVY_ATOM_RADIUS = numWritten;
 				reset();
 			}
-			numWritten = 0;
+			numWritten = -1;
 		}
 		
 		if (key == 't') {
-			if (numWritten != 0) 
+			if (numWritten != -1) 
 				Constants.SIMULATION_TIME_STEPS = numWritten;
-			numWritten = 0;
+			numWritten = -1;
 		}
 		
 		if (key == 'z') {
@@ -298,19 +312,25 @@ public class SimulationMain extends PApplet {
 		}
 		
 		if (key == 'm') {
-			if (numWritten != 0) {
+			if (numWritten != -1) {
 				Constants.LIGHT_MASS = numWritten;
 				reset();
 			}
-			numWritten = 0;
+			numWritten = -1;
 		}
 		
 		if (key == 'M') {
-			if (numWritten != 0) {
+			if (numWritten != -1) {
 				Constants.HEAVY_MASS = numWritten;
 				reset();
 			}
-			numWritten = 0;
+			numWritten = -1;
+		}
+		
+		if (key == 'l') {
+			if (numWritten != -1)
+				Constants.TRAIL_MAX_LENGTH = numWritten;
+			numWritten = -1;
 		}
 		
 		if (keyCode == KeyEvent.VK_F1) {
@@ -330,6 +350,7 @@ public class SimulationMain extends PApplet {
 		System.out.println("SPACE\t\tResets the simulation");
 		System.out.println("z\t\tResets all values to their default value");
 		System.out.println("t\t\tSets the time increment on each frame");
+		System.out.println("l\t\tSets the maximum length of the marked trail.\n\t\tA value of 0 means no limit");
 		
 		System.out.println("\nSpecific particle settings");
 		System.out.println("------------------------------------------------------");
