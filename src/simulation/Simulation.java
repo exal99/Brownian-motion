@@ -11,6 +11,10 @@ public class Simulation {
 	private int width, height;
 	
 	public Simulation(int nLightAtoms, int nHeavyAtoms, int width, int height, PApplet applet) {
+		reset(nLightAtoms, nHeavyAtoms, width, height, applet);
+	}
+	
+	public void reset(int nLightAtoms, int nHeavyAtoms, int width, int height, PApplet applet) {
 		this.width = width;
 		this.height = height;
 		events = new PriorityQueue<CollisionEvent>();

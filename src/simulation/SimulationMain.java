@@ -12,6 +12,8 @@ import java.util.Hashtable;
 import java.util.LinkedList;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import javax.swing.JOptionPane;
 
@@ -31,14 +33,14 @@ public class SimulationMain extends PApplet {
 	
 	private Hashtable<Atom, Integer> selected;
 	private ArrayList<LinkedList<PVector>> selectedTrails;
-	
 	private Hashtable<Atom, Integer> indexMapping;
+	
+	private float fpsCap;
 	
 	
 	@Override
 	public void settings() {
 		size(800,600);
-
 	}
 	
 	private MenuBar createMenuBar() {
@@ -48,8 +50,8 @@ public class SimulationMain extends PApplet {
 		MenuItem pause = new MenuItem("Pause", new MenuShortcut(KeyEvent.VK_P));
 		MenuItem reset = new MenuItem("Reset", new MenuShortcut(KeyEvent.VK_SPACE));
 		
-		quit.addActionListener((ActionEvent e) -> {simThread.interrupt(); exit();});
-		pause.addActionListener((ActionEvent e) -> {paused = !paused;});
+		quit.addActionListener((ActionEvent e) -> {simThread.terminate(); exit();});
+		pause.addActionListener((ActionEvent e) -> paused = !paused);
 		reset.addActionListener((ActionEvent e) -> reset()); 
 		
 		simulation.add(quit);
@@ -67,15 +69,26 @@ public class SimulationMain extends PApplet {
 		MenuItem trailLimit = new MenuItem("Trail length", new MenuShortcut(KeyEvent.VK_L));
 		trailLimit.setActionCommand("trail");
 		
+		MenuItem frameRate = new MenuItem("Frame rate", new MenuShortcut(KeyEvent.VK_F));
+		frameRate.setActionCommand("fps");
+		
+		MenuItem stepTime = new MenuItem("Step time", new MenuShortcut(KeyEvent.VK_T));
+		stepTime.setActionCommand("step");
+		
 		MenuItem resetValues = new MenuItem("Reset Settings", new MenuShortcut(KeyEvent.VK_Z));
 		resetValues.addActionListener((ActionEvent e) -> {Constants.RESET(); reset();});
+		
 		
 		MenuItemListener listener = new MenuItemListener();
 		setDimentions.addActionListener(listener);
 		trailLimit.addActionListener(listener);
+		frameRate.addActionListener(listener);
+		stepTime.addActionListener(listener);
 		
 		globalSettings.add(setDimentions);
 		globalSettings.add(trailLimit);
+		globalSettings.add(frameRate);
+		globalSettings.add(stepTime);
 		globalSettings.add(resetValues);
 		
 		Menu radius = new Menu("Set radisus");
@@ -128,7 +141,8 @@ public class SimulationMain extends PApplet {
 	
 	@Override
 	public void setup() {
-		frameRate(60);
+		fpsCap = 60;
+		frameRate(fpsCap);
 		surface.setTitle("Brownian Motion Simulation");
 		getFrame().setMenuBar(createMenuBar());
 		
@@ -165,13 +179,10 @@ public class SimulationMain extends PApplet {
 	}
 	
 	private void reset() {
-		simThread.terminate();
-		simThread.interrupt();
-		
+		noLoop();
 		snapshotQueue = new ArrayBlockingQueue<SimulationDiffrence>(Constants.GET_QUEUE_LIMIT());
-		simThread = new SimulationThread(snapshotQueue, Constants.NUMBER_OF_LIGHT_ATOMS, Constants.NUMBER_OF_HEAVY_ATOMS, width, height, this);
-		
-		atoms = simThread.getAtoms();
+		atoms = simThread.reset(snapshotQueue, Constants.NUMBER_OF_LIGHT_ATOMS,
+				Constants.NUMBER_OF_HEAVY_ATOMS, width, height, this);
 		
 		time = 0;
 		
@@ -179,7 +190,6 @@ public class SimulationMain extends PApplet {
 		selected = new Hashtable<Atom, Integer>();
 		selectedTrails = new ArrayList<LinkedList<PVector>>();
 		
-		simThread.start();
 		waitForLoad();
 		
 		try {
@@ -187,7 +197,7 @@ public class SimulationMain extends PApplet {
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
-		
+		loop();
 	}
 	
 	private void waitForLoad() {
@@ -196,7 +206,7 @@ public class SimulationMain extends PApplet {
 		while (!simThread.doneLoading()) {
 			synchronized(SimulationThread.LOCK) {
 				try {
-					SimulationThread.LOCK.wait();
+					SimulationThread.LOCK.wait(3000);
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
@@ -226,7 +236,6 @@ public class SimulationMain extends PApplet {
 	public void draw() {
 		background(51);
 		
-		
 		if (!paused) {
 			time += Constants.SIMULATION_TIME_STEPS;
 		}
@@ -255,12 +264,11 @@ public class SimulationMain extends PApplet {
 			ellipse(pos.x, pos.y, atom.getRadius() * 2, atom.getRadius() * 2);
 		}
 		
-		
 		fill(255, 0, 0);
 		textSize(30);
-		text("Total Kinetic Energy: " + Math.round(calcKeneticEnergy() * 100.0f) / 100.0f, 30, height - 40);
+		text("Total Kinetic Energy: " + round(calcKeneticEnergy() * 100.0f) / 100.0f, 30, height - 40);
 		fill(0,246,255);
-		text("FPS: " + Math.round(frameRate), width-150, 40);
+		text("FPS: " + round(frameRate), width-150, 40);
 		
 		while (time > nextUpdate.time) {
 			updateAtoms(nextUpdate.atoms);
@@ -293,13 +301,26 @@ public class SimulationMain extends PApplet {
 		}
 	}
 	
+	@Override
+	public void frameRate(float fps) {
+		fpsCap = fps;
+		super.frameRate(fps);
+	}
+	
 	class MenuItemListener implements ActionListener {
 		
-		private void makeInputDialog(String title, String text, String startValue, InputHandeler i) {
+		private void makeInputDialog(String title, String text, String startValue, Predicate<String> condition, Consumer<String> consumer, boolean reset) {
 			String s = (String) JOptionPane.showInputDialog(getFrame(), text, title,
 						JOptionPane.PLAIN_MESSAGE, null, null, startValue);
-			if (s != null)
-				i.handleInput(s);
+			if (s != null && condition.test(s)) {
+				consumer.accept(s);
+				if (reset)
+					reset();
+			}
+		}
+		
+		private void makeInputDialog(String title, String text, String startValue, Predicate<String> condition, Consumer<String> consumer) {
+			makeInputDialog(title, text, startValue, condition, consumer, true);
 		}
 		
 		private int parseInt(String integer) {
@@ -309,86 +330,96 @@ public class SimulationMain extends PApplet {
 				return -1;
 			}
 		}
+		
+		private boolean dimentionsCondition(String string) {
+			return string.split(",").length == 2 && parseInt(string.split(",")[0]) > 0 && parseInt(string.split(",")[1]) > 0 ;
+		}
+		
+		private void updateDimensions(String string) {
+			String[] dim = string.split(",");
+			surface.setSize(parseInt(dim[0]), parseInt(dim[1]));
+		}
+		
 
 		@Override
 		public void actionPerformed(ActionEvent e) {
 			switch (e.getActionCommand()) {
 			case "dim":
 				makeInputDialog("New window size", "Type a new width and hight of the window.\n"
-						+ "Seperate the two with a comma", width + "," + height, (String s) -> {
-							String[] dim = s.split(",");
-							if (dim.length == 2) {
-								int w = parseInt(dim[0]);
-								int h = parseInt(dim[1]);
-								if (w != -1 && h != -1) {
-									surface.setSize(w, h);
-									reset();
-								}
-							}
-						});
+						+ "Seperate the two with a comma", width + "," + height,
+						this::dimentionsCondition, this::updateDimensions);
 				break;
 			case "trail":
 				makeInputDialog("New maximum trail length", "Type a new maximum length for the selected trails.\n"
 						+ "A value of 0 means no limit.", "" + Constants.TRAIL_MAX_LENGTH,
-						(String s) -> Constants.TRAIL_MAX_LENGTH = (parseInt(s) != -1) ? parseInt(s) : Constants.TRAIL_MAX_LENGTH);
+						(String s) -> parseInt(s) != 0,
+						(String s) -> Constants.TRAIL_MAX_LENGTH = parseInt(s), false);
 				break;
 			case "s_rad":
 				makeInputDialog("New small radius", "Type a new radius for the small particles.",
 						"" + Constants.LIGHT_ATOM_RADIUS,
-						(String s) -> {Constants.LIGHT_ATOM_RADIUS = (parseInt(s) > 0) ? parseInt(s) : Constants.LIGHT_ATOM_RADIUS;
-									   reset();});
+						(String s) -> parseInt(s) > 0,
+						(String s) -> Constants.LIGHT_ATOM_RADIUS = parseInt(s));
 				break;
 			case "l_rad":
 				makeInputDialog("New large radius", "Type a new radius for the large particles.",
 						"" + Constants.HEAVY_ATOM_RADIUS,
-						(String s) -> {Constants.HEAVY_ATOM_RADIUS = (parseInt(s) > 0) ? parseInt(s) : Constants.HEAVY_ATOM_RADIUS;
-									   reset();});
+						(String s) -> parseInt(s) > 0,
+						(String s) -> Constants.HEAVY_ATOM_RADIUS = parseInt(s));
 				break;
 			case "s_vel":
 				makeInputDialog("New small particle maximum starting velocity", "Type a new maximum starting velocity for the small particles.",
-						"" + Math.round(Constants.LIGHT_MAX_START_VEL * 1000),
-						(String s) -> {Constants.LIGHT_MAX_START_VEL = (parseInt(s) > 0) ? parseInt(s) / 1000.0f: Constants.LIGHT_MAX_START_VEL;
-									   reset();});
+						"" + round(Constants.LIGHT_MAX_START_VEL * 1000),
+						(String s) -> parseInt(s) > 0,
+						(String s) -> Constants.LIGHT_MAX_START_VEL = parseInt(s) / 1000.0f);
 				break;
 			case "l_vel":
 				makeInputDialog("New large particle maximum starting velocity", "Type a new maximum starting velocity for the large particles.",
-						"" + Math.round(Constants.HEAVY_MAX_START_VEL * 1000),
-						(String s) -> {Constants.HEAVY_MAX_START_VEL = (parseInt(s) > 0) ? parseInt(s) / 1000.0f : Constants.HEAVY_MAX_START_VEL;
-									   reset();});
+						"" + round(Constants.HEAVY_MAX_START_VEL * 1000),
+						(String s) -> parseInt(s) > 0,
+						(String s) -> Constants.HEAVY_MAX_START_VEL = parseInt(s) / 1000.0f);
 				break;
 			case "s_natoms":
 				makeInputDialog("Number of small particles", "Type a new number of small particles.",
 						"" + Constants.NUMBER_OF_LIGHT_ATOMS,
-						(String s) -> {Constants.NUMBER_OF_LIGHT_ATOMS = (parseInt(s) > 0) ? parseInt(s) : Constants.NUMBER_OF_LIGHT_ATOMS;
-									   reset();});
+						(String s) -> parseInt(s) > 0,
+						(String s) -> Constants.NUMBER_OF_LIGHT_ATOMS = parseInt(s));
 				break;
 			case "l_natoms":
 				makeInputDialog("Number of large particles", "Type a new number of large particles.",
 						"" + Constants.HEAVY_ATOM_RADIUS,
-						(String s) -> {Constants.HEAVY_ATOM_RADIUS = (parseInt(s) > 0) ? parseInt(s) : Constants.HEAVY_ATOM_RADIUS;
-									   reset();});
+						(String s) -> parseInt(s) > 0,
+						(String s) -> Constants.HEAVY_ATOM_RADIUS = parseInt(s));
 				break;
 			case "s_mass":
 				makeInputDialog("New small particle mass", "Type a new 'mass' for the small particles.",
 						"" + Constants.LIGHT_MASS,
-						(String s) -> {Constants.LIGHT_MASS = (parseInt(s) > 0) ? parseInt(s) : Constants.LIGHT_MASS;
-									   reset();});
+						(String s) -> parseInt(s) > 0,
+						(String s) -> Constants.LIGHT_MASS = parseInt(s));
 				break;
 			case "l_mass":
 				makeInputDialog("New large particle mass", "Type a new 'mass' for the large particles.",
 						"" + Constants.HEAVY_MASS,
-						(String s) -> {Constants.HEAVY_MASS = (parseInt(s) > 0) ? parseInt(s) : Constants.HEAVY_MASS;
-									   reset();});
+						(String s) -> parseInt(s) > 0,
+						(String s) -> Constants.HEAVY_MASS = parseInt(s));
+				break;
+			case "fps":
+				makeInputDialog("New max fps", "Type a new maximum frames per second (fps).", "" + round(fpsCap),
+						(String s) -> parseInt(s) >= 10, 
+						(String s) -> frameRate(parseInt(s)), false);
+				break;
+			case "step":
+				makeInputDialog("New simulation time step", "Type a new time step in ms. The time step is how much time passes each frame.\n"
+						+ "Note: The time step is only used for the animation and has no effect on the accuracy of the simulation.\n"
+						+ "An optimal time step would be 1/fps * 1000", "" + Constants.SIMULATION_TIME_STEPS,
+						(String s) -> parseInt(s) > 0,
+						(String s) -> Constants.SIMULATION_TIME_STEPS = parseInt(s), false);
 				break;
 			}
 		}
 		
 		
 		
-	}
-	
-	private interface InputHandeler {
-		public void handleInput(String input);
 	}
 
 	public static void main(String[] args) {
