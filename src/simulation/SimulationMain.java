@@ -243,7 +243,8 @@ public class SimulationMain extends PApplet {
 			PVector pos = atom.getPos(time);
 			if (selected.containsKey(atom)) {
 				fill(244, 200, 66);
-				selectedTrails.get(selected.get(atom)).add(pos);
+				if (!paused)
+					selectedTrails.get(selected.get(atom)).add(pos);
 				while (Constants.TRAIL_MAX_LENGTH > 0 && selectedTrails.get(selected.get(atom)).size() > Constants.TRAIL_MAX_LENGTH) {
 					selectedTrails.get(selected.get(atom)).pop();
 				}
