@@ -2,7 +2,7 @@ package simulation;
 
 public class Constants {
 	
-	private static final int N_LIGHT_ATOMS = 500;
+	private static final int N_LIGHT_ATOMS = 300;
 	private static final int N_HEAVY_ATOMS = 10;
 	
 	private static final int L_MASS = 10;
