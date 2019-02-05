@@ -183,8 +183,7 @@ public class SimulationMain extends PApplet {
 		return;
 	}
 	
-	private void reset() {
-		noLoop();
+	private synchronized void reset() {
 		snapshotQueue = new ArrayBlockingQueue<SimulationDiffrence>(Constants.GET_QUEUE_LIMIT());
 		atoms = simThread.reset(snapshotQueue, Constants.NUMBER_OF_LIGHT_ATOMS,
 				Constants.NUMBER_OF_HEAVY_ATOMS, width, height, this);
@@ -202,7 +201,6 @@ public class SimulationMain extends PApplet {
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
-		loop();
 	}
 	
 	private void waitForLoad() {
@@ -238,7 +236,7 @@ public class SimulationMain extends PApplet {
 	}
 	
 	@Override
-	public void draw() {
+	public synchronized void draw() {
 		background(51);
 		
 		if (!paused) {
