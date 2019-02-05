@@ -387,14 +387,14 @@ public class SimulationMain extends PApplet {
 			case "s_natoms":
 				makeInputDialog("Number of small particles", "Type a new number of small particles.",
 						"" + Constants.NUMBER_OF_LIGHT_ATOMS,
-						(String s) -> parseInt(s) > 0,
+						(String s) -> parseInt(s) > -1,
 						(String s) -> Constants.NUMBER_OF_LIGHT_ATOMS = parseInt(s));
 				break;
 			case "l_natoms":
 				makeInputDialog("Number of large particles", "Type a new number of large particles.",
-						"" + Constants.HEAVY_ATOM_RADIUS,
-						(String s) -> parseInt(s) > 0,
-						(String s) -> Constants.HEAVY_ATOM_RADIUS = parseInt(s));
+						"" + Constants.NUMBER_OF_HEAVY_ATOMS,
+						(String s) -> parseInt(s) > -1,
+						(String s) -> Constants.NUMBER_OF_HEAVY_ATOMS = parseInt(s));
 				break;
 			case "s_mass":
 				makeInputDialog("New small particle mass", "Type a new 'mass' for the small particles.",
