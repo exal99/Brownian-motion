@@ -1,4 +1,5 @@
 package simulation;
+import java.awt.CheckboxMenuItem;
 import java.awt.Frame;
 import java.awt.Menu;
 import java.awt.MenuBar;
@@ -36,6 +37,7 @@ public class SimulationMain extends PApplet {
 	private Hashtable<Atom, Integer> indexMapping;
 	
 	private float fpsCap;
+	private CheckboxMenuItem hideSmall;
 	
 	
 	@Override
@@ -75,6 +77,8 @@ public class SimulationMain extends PApplet {
 		MenuItem stepTime = new MenuItem("Step time", new MenuShortcut(KeyEvent.VK_T));
 		stepTime.setActionCommand("step");
 		
+		hideSmall = new CheckboxMenuItem("Hide small particles", false);
+		
 		MenuItem resetValues = new MenuItem("Reset Settings", new MenuShortcut(KeyEvent.VK_Z));
 		resetValues.addActionListener((ActionEvent e) -> {Constants.RESET(); reset();});
 		
@@ -89,6 +93,7 @@ public class SimulationMain extends PApplet {
 		globalSettings.add(trailLimit);
 		globalSettings.add(frameRate);
 		globalSettings.add(stepTime);
+		globalSettings.add(hideSmall);
 		globalSettings.add(resetValues);
 		
 		Menu radius = new Menu("Set radisus");
@@ -183,7 +188,7 @@ public class SimulationMain extends PApplet {
 		snapshotQueue = new ArrayBlockingQueue<SimulationDiffrence>(Constants.GET_QUEUE_LIMIT());
 		atoms = simThread.reset(snapshotQueue, Constants.NUMBER_OF_LIGHT_ATOMS,
 				Constants.NUMBER_OF_HEAVY_ATOMS, width, height, this);
-		
+
 		time = 0;
 		
 		createIndexMapping();
@@ -248,7 +253,9 @@ public class SimulationMain extends PApplet {
 			}
 		}		
 			
-		for (Atom atom : atoms) {
+		for (int i = (!hideSmall.getState()) ? 0 : Constants.NUMBER_OF_LIGHT_ATOMS;
+		     i < atoms.length; i++) {
+			Atom atom = atoms[i];
 			PVector pos = atom.getPos(time);
 			if (selected.containsKey(atom)) {
 				fill(244, 200, 66);
@@ -352,7 +359,7 @@ public class SimulationMain extends PApplet {
 			case "trail":
 				makeInputDialog("New maximum trail length", "Type a new maximum length for the selected trails.\n"
 						+ "A value of 0 means no limit.", "" + Constants.TRAIL_MAX_LENGTH,
-						(String s) -> parseInt(s) != 0,
+						(String s) -> parseInt(s) > -1,
 						(String s) -> Constants.TRAIL_MAX_LENGTH = parseInt(s), false);
 				break;
 			case "s_rad":
