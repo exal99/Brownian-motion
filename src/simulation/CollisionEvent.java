@@ -1,5 +1,7 @@
 package simulation;
 
+import java.util.Hashtable;
+
 import simulation.Atom.Wall;
 import simulation.Atom.WallCollision;
 
@@ -10,33 +12,37 @@ public class CollisionEvent implements Comparable<CollisionEvent>{
 	
 	private CollisionEventType type;
 	private Atom atom1, atom2;
-	private float time;
+	private float occuranceTime;
+	private float createdTime;
 	private Wall wall;
-	private boolean active;
 	
-	public CollisionEvent(Atom atom1, WallCollision collision) {
-		type = CollisionEventType.WALL_COLLISION;
+	public CollisionEvent(Atom atom1, WallCollision collision, float currentTime) {
+		type = WALL_COLLISION;
 		this.atom1 = atom1;
-		this.time = collision.time;
+		this.occuranceTime = collision.time;
 		this.wall = collision.wall;
-		active = true;
+		createdTime = currentTime;
 	}
 	
-	public CollisionEvent(Atom atom1, Atom atom2, float time) {
+	public CollisionEvent(Atom atom1, Atom atom2, float occuranceTime, float currentTime) {
 		this.atom1 = atom1;
 		this.atom2 = atom2;
-		this.time = time;
-		type = CollisionEventType.PARTICLE_COLLISION;
-		active = true;
+		this.occuranceTime = occuranceTime;
+		createdTime = currentTime;
+		type = PARTICLE_COLLISION;
 	}
 	
-	public void dissable() {
-		active = false;
+	public boolean isActive(Hashtable<Atom, Float> lastUpdate) {
+		switch(type) {
+		case WALL_COLLISION:
+			return createdTime >= lastUpdate.get(atom1);
+		case PARTICLE_COLLISION:
+			return createdTime >= lastUpdate.get(atom1) && createdTime > lastUpdate.get(atom2);
+		default:
+			throw new Error("ERROR!");
+		}
 	}
 	
-	public boolean isActive() {
-		return active;
-	}
 	
 	public Wall getWall() {
 		return wall;
@@ -55,25 +61,25 @@ public class CollisionEvent implements Comparable<CollisionEvent>{
 	}
 	
 	public float getTime() {
-		return time;
+		return occuranceTime;
 	}
 
 	@Override
 	public int compareTo(CollisionEvent other) {
-		return Float.compare(time, other.time);
+		return Float.compare(occuranceTime, other.occuranceTime);
 	}
 	
 	@Override
 	public boolean equals(Object other) {
 		if (other instanceof CollisionEvent) {
 			CollisionEvent event = (CollisionEvent) other;
-			if (type == CollisionEventType.WALL_COLLISION) {
-				if (event.type == CollisionEventType.WALL_COLLISION)
+			if (type == WALL_COLLISION) {
+				if (event.type == WALL_COLLISION)
 					return atom1.equals(event.atom1);
 				else
 					return atom1.equals(event.atom1) || atom1.equals(event.atom2);
 			} else {
-				if (event.type == CollisionEventType.WALL_COLLISION)
+				if (event.type == WALL_COLLISION)
 					return event.atom1.equals(atom1) || event.atom1.equals(atom2);
 				else
 					return atom1.equals(event.atom1) || atom1.equals(event.atom2) ||
@@ -83,13 +89,13 @@ public class CollisionEvent implements Comparable<CollisionEvent>{
 		return false;
 	}
 	
+	public boolean contains(Atom atom) {
+		return (type == WALL_COLLISION) ? atom.equals(atom1) : atom.equals(atom1) || atom.equals(atom2);
+	}
+	
 	@Override
 	public String toString() {
-		if (active) {
-			return type.name();
-		} else {
-			return "INACTIVE";
-		}
+		return type.name();
 	}
 		
 	

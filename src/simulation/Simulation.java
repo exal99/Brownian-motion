@@ -1,4 +1,5 @@
 package simulation;
+import java.util.Hashtable;
 import java.util.PriorityQueue;
 
 import processing.core.PApplet;
@@ -9,6 +10,7 @@ public class Simulation {
 	private PriorityQueue<CollisionEvent> events;
 	private Atom[] atoms;
 	private int width, height;
+	private Hashtable<Atom, Float> lastUpdated;
 	
 	public Simulation(int nLightAtoms, int nHeavyAtoms, int width, int height, PApplet applet) {
 		reset(nLightAtoms, nHeavyAtoms, width, height, applet);
@@ -18,8 +20,10 @@ public class Simulation {
 		this.width = width;
 		this.height = height;
 		events = new PriorityQueue<CollisionEvent>();
+		lastUpdated = new Hashtable<Atom, Float>(nLightAtoms + nHeavyAtoms, 1);
 		createAtoms(nLightAtoms, nHeavyAtoms, applet);
 		createEvents();
+		
 	}
 	
 	private void createAtoms(int nLightAtoms, int nHeavyAtoms, PApplet applet) {
@@ -41,13 +45,14 @@ public class Simulation {
 	private void createEvents() {
 		for (int i = 0; i < atoms.length; i++) {
 			Atom atom = atoms[i];
-			events.add(new CollisionEvent(atom, atom.getWallCollisionTime(width, height)));
+			lastUpdated.put(atom, 0.0f);
+			events.add(new CollisionEvent(atom, atom.getWallCollisionTime(width, height), 0));
 			
 			for (int j = i + 1; j < atoms.length; j++) {
 				Atom collisionAtom = atoms[j];
 				float time = atom.getColitionTime(collisionAtom);
 				if (time != Float.POSITIVE_INFINITY)
-					events.add(new CollisionEvent(atom, collisionAtom, time));
+					events.add(new CollisionEvent(atom, collisionAtom, time, 0));
 			}
 			
 		}
@@ -56,19 +61,13 @@ public class Simulation {
 	private CollisionEvent getNextEvent() {
 		CollisionEvent event = events.poll();
 		
-		while (!event.isActive()) {
+		while (!event.isActive(lastUpdated)) {
 			event = events.poll();
 		}
 		
 		return event;
 	}
 	
-	private void dissableEvents(CollisionEvent event) {
-		for (CollisionEvent e : events) {
-			if (e.equals(event))
-				e.dissable();
-		}
-	}
 	
 	public SimulationDiffrence advanceSimulation() {
 		CollisionEvent nextEvent = getNextEvent();
@@ -93,16 +92,16 @@ public class Simulation {
 		default:
 			eventAtoms = new Atom[] {};
 		}
-		
-		dissableEvents(nextEvent);
+
 		
 		for (Atom a: eventAtoms) {
-			events.add(new CollisionEvent(a, a.getWallCollisionTime(width, height)));
+			lastUpdated.put(a, nextEvent.getTime());
+			events.add(new CollisionEvent(a, a.getWallCollisionTime(width, height), nextEvent.getTime()));
 			for (Atom other : atoms) {
 				if (other != a) {
 					float collisionTime = a.getColitionTime(other);
 					if (collisionTime != Float.POSITIVE_INFINITY) 
-						events.add(new CollisionEvent(a, other, collisionTime));
+						events.add(new CollisionEvent(a, other, collisionTime, nextEvent.getTime()));
 				}
 			}
 		}
